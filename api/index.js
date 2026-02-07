@@ -1,40 +1,70 @@
-const express = require('express');
-const dotenv = require('dotenv');
-const cors = require('cors');
-const helmet = require('helmet');
-const connectDB = require('../config/db');
+const express = require("express");
+const dotenv = require("dotenv");
+const cors = require("cors");
+const helmet = require("helmet");
+const connectDB = require("../config/db");
 
-const authRoutes = require('../routes/auth');
-const projectRoutes = require('../routes/project');
-const ticketRoutes = require('../routes/ticket');
-const commentRoutes = require('../routes/comment');
+// Routes
+const authRoutes = require("../routes/auth");
+const projectRoutes = require("../routes/project");
+const ticketRoutes = require("../routes/ticket");
+const commentRoutes = require("../routes/comment");
 
 dotenv.config();
 connectDB();
 
 const app = express();
 
-app.use(helmet());
+/* ================= SECURITY ================= */
 app.use(
-    cors({
-        origin: [
-            "http://localhost:5173",
-            "https://bug-trackera.netlify.app"
-        ],
-        credentials: true
+    helmet({
+        crossOriginResourcePolicy: false,
     })
 );
 
+/* ================= BODY PARSER ================= */
 app.use(express.json());
 
-app.use('/api/auth', authRoutes);
-app.use('/api/projects', projectRoutes);
-app.use('/api/tickets', ticketRoutes);
-app.use('/api/comments', commentRoutes);
+/* ================= CORS CONFIG ================= */
+const allowedOrigins = [
+    "http://localhost:5173",
+    "https://bug-trackera.netlify.app"
+];
 
-app.get('/', (req, res) => {
-    res.send('API is running on Vercel 🚀');
+app.use(
+    cors({
+        origin: function (origin, callback) {
+            // allow Postman, server-to-server calls
+            if (!origin) return callback(null, true);
+
+            if (allowedOrigins.includes(origin)) {
+                return callback(null, true);
+            } else {
+                return callback(new Error("CORS not allowed"), false);
+            }
+        },
+        credentials: true,
+        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allowedHeaders: ["Content-Type", "Authorization"],
+    })
+);
+
+/* ===== PRE-FLIGHT (VERY IMPORTANT FOR VERCEL) ===== */
+app.options("*", cors());
+
+/* ================= ROUTES ================= */
+app.use("/api/auth", authRoutes);
+app.use("/api/projects", projectRoutes);
+app.use("/api/tickets", ticketRoutes);
+app.use("/api/comments", commentRoutes);
+
+/* ================= ROOT TEST ================= */
+app.get("/", (req, res) => {
+    res.status(200).json({
+        success: true,
+        message: "Bug Tracker API running on Vercel 🚀",
+    });
 });
 
-
+/* ================= EXPORT (NO app.listen) ================= */
 module.exports = app;
