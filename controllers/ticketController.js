@@ -138,6 +138,9 @@ const updateTicket = async (req, res) => {
 /* DELETE TICKET → only admin + creator */
 const deleteTicket = async (req, res) => {
     try {
+        console.log('DELETE TICKET ROUTE HIT');
+        console.log('Params ID:', req.params.id);
+        console.log('User:', req.user?._id, req.user?.role);
         const ticket = await Ticket.findById(req.params.id);
         if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
 

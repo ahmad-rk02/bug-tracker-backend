@@ -61,28 +61,29 @@ const getCommentsByTicket = async (req, res) => {
 /* DELETE COMMENT → admin + own comment */
 const deleteComment = async (req, res) => {
     try {
+        console.log('DELETE COMMENT ROUTE HIT - ID from params:', req.params.id);
+        console.log('Current user:', req.user._id.toString(), req.user.role);
+
         const comment = await Comment.findById(req.params.id);
-        if (!comment) return res.status(404).json({ message: 'Comment not found' });
-
-        const ticket = await Ticket.findById(comment.ticketId);
-        if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
-
-        const project = await Project.findById(ticket.projectId);
-        if (!project || !isMember(project, req.user._id)) {
-            return res.status(403).json({ message: 'Not authorized' });
+        if (!comment) {
+            console.log('→ Comment not found in DB for this ID');
+            return res.status(404).json({ message: 'Comment not found' });
         }
 
-        const isAdmin = req.user.role === 'admin';
-        const isCommenter = comment.userId.equals(req.user._id);
+        console.log('→ Comment found → _id:', comment._id.toString());
+        console.log('→ Belongs to ticket:', comment.ticketId.toString());
+        console.log('→ Comment text snippet:', comment.text.substring(0, 50));
 
-        if (!isAdmin && !isCommenter) {
-            return res.status(403).json({ message: 'Can only delete your own comment or if admin' });
-        }
+        const deleteResult = await Comment.deleteOne({ _id: comment._id });
+        console.log('→ deleteOne result:', deleteResult);               // ← most important
 
-        await Comment.deleteOne({ _id: comment._id });
+        // Optional: prove it's gone (or not)
+        const checkStillThere = await Comment.findById(comment._id);
+        console.log('→ After delete → still exists?', !!checkStillThere);
+
         res.json({ message: 'Comment deleted' });
     } catch (err) {
-        console.error(err);
+        console.error('Delete comment error:', err);
         res.status(500).json({ message: 'Server error' });
     }
 };
