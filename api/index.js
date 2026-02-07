@@ -33,15 +33,15 @@ const allowedOrigins = [
 
 app.use(
     cors({
-        origin: function (origin, callback) {
-            // allow Postman, server-to-server calls
+        origin: (origin, callback) => {
+            // allow Postman / server requests
             if (!origin) return callback(null, true);
 
             if (allowedOrigins.includes(origin)) {
                 return callback(null, true);
-            } else {
-                return callback(new Error("CORS not allowed"), false);
             }
+
+            return callback(new Error("Not allowed by CORS"));
         },
         credentials: true,
         methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -49,16 +49,13 @@ app.use(
     })
 );
 
-/* ===== PRE-FLIGHT (VERY IMPORTANT FOR VERCEL) ===== */
-app.options("*", cors());
-
 /* ================= ROUTES ================= */
 app.use("/api/auth", authRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/tickets", ticketRoutes);
 app.use("/api/comments", commentRoutes);
 
-/* ================= ROOT TEST ================= */
+/* ================= ROOT ================= */
 app.get("/", (req, res) => {
     res.status(200).json({
         success: true,
@@ -66,5 +63,5 @@ app.get("/", (req, res) => {
     });
 });
 
-/* ================= EXPORT (NO app.listen) ================= */
+/* ================= EXPORT FOR VERCEL ================= */
 module.exports = app;
