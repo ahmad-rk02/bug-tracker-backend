@@ -3,9 +3,10 @@ const Project = require('../models/Project');
 const mongoose = require('mongoose');
 
 const isMember = (project, userId) =>
-    project.teamMembers.some((id) => id.equals(userId));
+    project.teamMembers.some(id => id.equals(userId));
 
-/* CREATE TICKET → admin + member (if in project) */
+/* ================= CREATE TICKET ================= */
+/* admin + member (if project member) */
 const createTicket = async (req, res) => {
     if (!['admin', 'member'].includes(req.user.role)) {
         return res.status(403).json({ message: 'Only admins and members can create tickets' });
@@ -35,14 +36,18 @@ const createTicket = async (req, res) => {
             status: 'To Do',
         });
 
-        res.status(201).json(ticket);
+        const populatedTicket = await Ticket.findById(ticket._id)
+            .populate('assignee', 'name email')
+            .populate('createdBy', 'name email');
+
+        res.status(201).json(populatedTicket);
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: 'Server error' });
     }
 };
 
-/* GET TICKETS BY PROJECT → all roles (if member) */
+/* ================= GET TICKETS BY PROJECT ================= */
 const getTicketsByProject = async (req, res) => {
     const { projectId } = req.params;
     const { status, priority, assignee, search } = req.query;
@@ -65,12 +70,13 @@ const getTicketsByProject = async (req, res) => {
             .sort({ createdAt: -1 });
 
         res.json(tickets);
-    } catch {
+    } catch (err) {
+        console.error(err);
         res.status(500).json({ message: 'Server error' });
     }
 };
 
-/* GET SINGLE TICKET → all roles (if member) */
+/* ================= GET SINGLE TICKET ================= */
 const getTicketById = async (req, res) => {
     try {
         const ticket = await Ticket.findById(req.params.id)
@@ -85,12 +91,14 @@ const getTicketById = async (req, res) => {
         }
 
         res.json(ticket);
-    } catch {
+    } catch (err) {
+        console.error(err);
         res.status(500).json({ message: 'Server error' });
     }
 };
 
-/* UPDATE TICKET → admin + creator + assignee */
+/* ================= UPDATE TICKET ================= */
+/* admin + creator + assignee */
 const updateTicket = async (req, res) => {
     const { title, description, priority, status, assignee } = req.body;
 
@@ -120,27 +128,30 @@ const updateTicket = async (req, res) => {
         if (assignee === null || assignee === '') {
             ticket.assignee = null;
         } else if (mongoose.Types.ObjectId.isValid(assignee)) {
-            // Only admin can assign to others
             if (!isAdmin && assignee !== req.user._id.toString()) {
                 return res.status(403).json({ message: 'Only admins can assign to other users' });
             }
             ticket.assignee = assignee;
         }
 
-        const updated = await ticket.save();
-        res.json(updated);
+        await ticket.save();
+
+        // 🔥 POPULATE BEFORE SENDING RESPONSE (MAIN FIX)
+        const populatedTicket = await Ticket.findById(ticket._id)
+            .populate('assignee', 'name email')
+            .populate('createdBy', 'name email');
+
+        res.json(populatedTicket);
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: 'Server error' });
     }
 };
 
-/* DELETE TICKET → only admin + creator */
+/* ================= DELETE TICKET ================= */
+/* admin + creator */
 const deleteTicket = async (req, res) => {
     try {
-        console.log('DELETE TICKET ROUTE HIT');
-        console.log('Params ID:', req.params.id);
-        console.log('User:', req.user?._id, req.user?.role);
         const ticket = await Ticket.findById(req.params.id);
         if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
 
@@ -164,7 +175,8 @@ const deleteTicket = async (req, res) => {
     }
 };
 
-/* ASSIGN TICKET → only admin */
+/* ================= ASSIGN TICKET (OPTIONAL) ================= */
+/* only admin */
 const assignTicket = async (req, res) => {
     if (req.user.role !== 'admin') {
         return res.status(403).json({ message: 'Only admins can assign tickets' });
@@ -181,17 +193,20 @@ const assignTicket = async (req, res) => {
         if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
 
         const project = await Project.findById(ticket.projectId);
-        if (!project) return res.status(404).json({ message: 'Project not found' });
-
-        if (!isMember(project, assignee)) {
+        if (!project || !isMember(project, assignee)) {
             return res.status(400).json({ message: 'Assignee must be a project member' });
         }
 
         ticket.assignee = assignee;
         await ticket.save();
 
-        res.json(ticket);
-    } catch {
+        const populatedTicket = await Ticket.findById(ticket._id)
+            .populate('assignee', 'name email')
+            .populate('createdBy', 'name email');
+
+        res.json(populatedTicket);
+    } catch (err) {
+        console.error(err);
         res.status(500).json({ message: 'Server error' });
     }
 };
